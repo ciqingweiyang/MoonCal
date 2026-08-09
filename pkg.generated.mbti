@@ -1,0 +1,245 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "ciqingweiyang/mooncal"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn analyze(String) -> Result[CalendarSummary, MoonCalError]
+
+pub fn calendar_to_ics(Calendar) -> String
+
+pub fn calendar_to_json(Calendar) -> String
+
+pub fn days_in_month(Int, Int) -> Int
+
+pub fn error_to_text(MoonCalError) -> String
+
+pub fn escape_ics_text(String) -> String
+
+pub fn escape_json(String) -> String
+
+pub fn event_effective_end(Event) -> DateTime?
+
+pub fn event_is_recurring(Event) -> Bool
+
+pub fn event_overlaps(Event, DateTime, DateTime) -> Bool
+
+pub fn event_to_ics(Event) -> String
+
+pub fn event_to_json(Event) -> String
+
+pub fn events_between(Calendar, DateTime, DateTime) -> Array[Event]
+
+pub fn expand_calendar_between(Calendar, DateTime, DateTime, limit? : Int) -> Result[Array[Occurrence], MoonCalError]
+
+pub fn expand_event_between(Event, DateTime, DateTime, limit? : Int) -> Result[Array[Occurrence], MoonCalError]
+
+pub fn find_event(Calendar, String) -> Event?
+
+pub fn frequency_to_string(Frequency) -> String
+
+pub fn is_leap_year(Int) -> Bool
+
+pub fn is_valid_date(Int, Int, Int) -> Bool
+
+pub fn next_occurrences(Calendar, DateTime, limit? : Int) -> Result[Array[Occurrence], MoonCalError]
+
+pub fn occurrences_between(Calendar, DateTime, DateTime, limit? : Int) -> Result[Array[Occurrence], MoonCalError]
+
+pub fn occurrences_on_date(Calendar, DateTime, limit? : Int) -> Result[Array[Occurrence], MoonCalError]
+
+pub fn occurrences_to_json(Array[Occurrence]) -> String
+
+pub let package_name : String
+
+pub fn parse(String) -> Result[Calendar, MoonCalError]
+
+pub fn parse_calendar(String) -> Result[Calendar, MoonCalError]
+
+pub fn parse_datetime(String, is_date_hint? : Bool) -> Result[DateTime, MoonCalError]
+
+pub fn parse_duration(String) -> Result[Duration, MoonCalError]
+
+pub fn parse_event(Array[IcsProperty]) -> Result[Event, MoonCalError]
+
+pub fn parse_frequency(String) -> Frequency?
+
+pub fn parse_properties(String) -> Result[Array[IcsProperty], MoonCalError]
+
+pub fn parse_property_line(String, Int) -> Result[IcsProperty, MoonCalError]
+
+pub fn parse_rrule(String) -> Result[RRule, MoonCalError]
+
+pub fn parse_rule(String) -> Result[RRule, MoonCalError]
+
+pub fn parse_weekday(String) -> Weekday?
+
+pub fn rrule_to_ics(RRule) -> String
+
+pub let sample_ics : String
+
+pub fn summarize(Calendar) -> CalendarSummary
+
+pub fn summary_to_json(CalendarSummary) -> String
+
+pub fn summary_to_text(CalendarSummary) -> String
+
+pub fn unescape_text(String) -> String
+
+pub fn unfold_lines(String) -> Result[Array[(Int, String)], MoonCalError]
+
+pub fn validate_calendar(Calendar) -> Array[Diagnostic]
+
+pub fn validate_event(Event) -> Array[Diagnostic]
+
+pub fn weekday_to_string(Weekday) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct Calendar {
+  version : String?
+  prodid : String?
+  events : Array[Event]
+  properties : Array[IcsProperty]
+} derive(@debug.Debug)
+
+pub(all) struct CalendarSummary {
+  event_count : Int
+  recurring_event_count : Int
+  all_day_event_count : Int
+  earliest : DateTime?
+  latest : DateTime?
+  diagnostics : Array[Diagnostic]
+} derive(@debug.Debug)
+
+pub(all) struct DateTime {
+  year : Int
+  month : Int
+  day : Int
+  hour : Int
+  minute : Int
+  second : Int
+  is_date : Bool
+  is_utc : Bool
+} derive(Eq, @debug.Debug)
+pub fn DateTime::DateTime(Int, Int, Int, hour? : Int, minute? : Int, second? : Int, is_date? : Bool, is_utc? : Bool) -> Self
+pub fn DateTime::add_days(Self, Int) -> Self
+pub fn DateTime::add_months(Self, Int) -> Self
+pub fn DateTime::add_seconds(Self, Int) -> Self
+pub fn DateTime::add_years(Self, Int) -> Self
+pub fn DateTime::after(Self, Self) -> Bool
+pub fn DateTime::before(Self, Self) -> Bool
+pub fn DateTime::compare(Self, Self) -> Int
+pub fn DateTime::date_key(Self) -> Int
+pub fn DateTime::days_until(Self, Self) -> Int
+pub fn DateTime::format(Self) -> String
+pub fn DateTime::is_valid(Self) -> Bool
+pub fn DateTime::months_until(Self, Self) -> Int
+pub fn DateTime::same_day(Self, Self) -> Bool
+pub fn DateTime::seconds_until(Self, Self) -> Int
+pub fn DateTime::to_ics_value(Self) -> String
+pub fn DateTime::weekday(Self) -> Weekday
+pub fn DateTime::years_until(Self, Self) -> Int
+pub impl Show for DateTime
+
+pub(all) struct Diagnostic {
+  code : String
+  message : String
+  severity : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Duration {
+  negative : Bool
+  weeks : Int
+  days : Int
+  hours : Int
+  minutes : Int
+  seconds : Int
+} derive(Eq, @debug.Debug)
+pub fn Duration::Duration(negative? : Bool, weeks? : Int, days? : Int, hours? : Int, minutes? : Int, seconds? : Int) -> Self
+pub fn Duration::apply(Self, DateTime) -> DateTime
+pub fn Duration::format(Self) -> String
+pub fn Duration::is_zero(Self) -> Bool
+pub fn Duration::total_seconds(Self) -> Int
+pub impl Show for Duration
+
+pub(all) struct Event {
+  uid : String
+  start : DateTime
+  end : DateTime?
+  summary : String
+  description : String?
+  location : String?
+  status : String?
+  url : String?
+  categories : Array[String]
+  created : DateTime?
+  last_modified : DateTime?
+  sequence : Int?
+  rrule : RRule?
+  duration : Duration?
+  rdate : Array[DateTime]
+  exdate : Array[DateTime]
+  raw : Array[IcsProperty]
+} derive(@debug.Debug)
+
+pub(all) enum Frequency {
+  Daily
+  Weekly
+  Monthly
+  Yearly
+} derive(Eq, @debug.Debug)
+
+pub(all) struct IcsProperty {
+  name : String
+  params : Map[String, String]
+  value : String
+  line : Int
+} derive(@debug.Debug)
+
+pub(all) enum MoonCalError {
+  InvalidLine(line~ : Int, message~ : String)
+  InvalidProperty(line~ : Int, name~ : String, message~ : String)
+  InvalidDateTime(value~ : String)
+  InvalidRRule(value~ : String, message~ : String)
+  InvalidCalendar(message~ : String)
+  MissingEventField(field~ : String)
+  UnsupportedFeature(feature~ : String)
+  LimitExceeded(limit~ : Int)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Occurrence {
+  uid : String
+  start : DateTime
+  end : DateTime?
+  summary : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct RRule {
+  freq : Frequency
+  interval : Int
+  count : Int?
+  until : DateTime?
+  byday : Array[Weekday]
+  bymonthday : Array[Int]
+  bymonth : Array[Int]
+} derive(Eq, @debug.Debug)
+pub fn RRule::RRule(Frequency, interval? : Int, count? : Int, until? : DateTime, byday? : Array[Weekday], bymonthday? : Array[Int], bymonth? : Array[Int]) -> Self
+
+pub(all) enum Weekday {
+  MO
+  TU
+  WE
+  TH
+  FR
+  SA
+  SU
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+
