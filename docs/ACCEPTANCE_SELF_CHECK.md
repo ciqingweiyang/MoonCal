@@ -1,6 +1,6 @@
 # MoonCal Hackathon Acceptance Self-Check
 
-Last checked: 2026-08-05
+Last checked: 2026-08-09
 
 ## Collision Check
 
@@ -14,7 +14,7 @@ Searches across Mooncakes-oriented results and GitHub did not find an obvious Mo
 - RDATE / EXDATE handling
 - MoonBit-native public APIs, CLI, tests, and examples
 
-Related projects exist in other ecosystems, and general date/time packages exist in MoonBit, but they do not appear to duplicate this project boundary. The project should still avoid claiming complete RFC 5545 coverage, because v0.1.0 intentionally supports a practical subset.
+Related projects exist in other ecosystems, and general date/time packages exist in MoonBit, but they do not appear to duplicate this project boundary. The project should still avoid claiming complete RFC 5545 coverage, because v0.1.1 intentionally supports a practical subset.
 
 ## Acceptance Checklist
 
@@ -30,12 +30,12 @@ Related projects exist in other ecosystems, and general date/time packages exist
 | Project builds successfully | Passed | `moon check` and `moon build` pass locally. |
 | Published to mooncakes.io | Release target defined | Mooncakes package name: `ciqingweiyang/mooncal`. |
 | Development process and commits are traceable | Passed | Repository keeps multiple meaningful commits on `main`. |
-| Clear functional boundary and maintenance value | Passed | README documents v0.1.0 support and non-goals; changelog records release scope. |
+| Clear functional boundary and maintenance value | Passed | README documents v0.1.1 support and non-goals; changelog records release scope. |
 | Third-party code/assets/dependencies have compatible licenses | Passed | No third-party code or assets are copied; project license is Apache-2.0. |
 
 ## Latest Local Verification
 
-The following commands were run successfully on 2026-08-05:
+The following commands were run successfully on 2026-08-09:
 
 ```bash
 moon check
@@ -56,5 +56,5 @@ Total tests: 44, passed: 44, failed: 0.
 
 - GitHub repository: `https://github.com/ciqingweiyang/MoonCal`
 - Mooncakes package: `ciqingweiyang/mooncal`
-- Version: `0.1.0`
+- Version: `0.1.1`
 - License: `Apache-2.0`
