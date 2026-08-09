@@ -4,7 +4,7 @@
 /// The v1 surface intentionally focuses on reusable library behavior:
 /// parsing unfolded ICS properties, extracting VEVENT records, expanding
 /// common RRULE patterns, validating calendar shape, and exporting summaries.
-pub let package_name : String = "placeholder/mooncal"
+pub let package_name : String = "ciqingweiyang/mooncal"
 
 ///|
 /// A compact fixture used by the CLI, examples, and smoke tests.
