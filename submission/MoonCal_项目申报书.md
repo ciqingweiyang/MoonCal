@@ -3,102 +3,27 @@
 ## 基本信息
 
 - 项目名称：MoonCal：MoonBit 原生 iCalendar 日程、任务与空闲忙碌时间处理库
-- 参赛者：刘瑞彤
-- 联系方式：15613701896
-- GitHub 仓库链接：https://github.com/ciqingweiyang/MoonCal
-- Mooncakes 包名：ciqingweiyang/mooncal
-- 项目方向：MoonBit 日历数据基础库 / 开发工具
-- 是否为移植项目：否，原创项目
-- 许可证：Apache-2.0
+- 参赛者：刘瑞彤；联系方式：15613701896
+- GitHub 仓库：https://github.com/ciqingweiyang/MoonCal
+- Mooncakes 包名：ciqingweiyang/mooncal；版本：0.1.2
+- 项目类型：原创 MoonBit 开源库；许可证：Apache-2.0
 
 ## 项目简介
 
-MoonCal 是一个用 MoonBit 编写的 iCalendar 工具库，聚焦 `.ics` 日历文本解析、`VEVENT` 事件建模、常见 `RRULE` 重复规则展开、`VTODO` 任务处理、`VFREEBUSY` 空闲忙碌时间段处理，以及面向应用集成的查询、验证和导出能力。它适合提醒工具、排期工具、静态站点、测试数据处理和自动化流程中对日历数据的轻量解析需求。
+MoonCal 是 MoonBit 原生 iCalendar / ICS 工具库，面向排期工具、提醒工具、静态站点生成器、测试数据处理和自动化流程，提供 `.ics` 解析、重复事件展开、待办任务查询、空闲忙碌时间段查询、验证诊断和 JSON / ICS 导出能力。项目核心功能全部使用 MoonBit 实现，不依赖其他语言库封装。
 
-项目 `0.1.2` 的边界非常明确：先做好 MoonBit 生态缺少的可复用日历基础库，不做 CalDAV 网络同步、完整时区数据库、会议邀请回复状态同步、超大文件流式解析等重型日历客户端功能。
+## 已完成内容
 
-## 主要功能
+当前版本支持 `VCALENDAR`、`VEVENT`、`VTODO`、`VFREEBUSY` 的实用子集解析，支持 iCalendar 折行展开、属性参数、事件字段、任务字段、`FREEBUSY` 时间段、`RRULE`、`RDATE`、`EXDATE` 和 `DURATION`。本次开发补齐了任务状态与优先级查询、忙碌窗口判断、验证诊断、JSON / ICS 导出、命令行示例、基础示例、CI、中文 README、API 文档和验收自查文档。
 
-- 解析 `VCALENDAR` / `VEVENT` / `VTODO` / `VFREEBUSY` 结构；
-- 支持 iCalendar 折行展开和属性参数，例如 `DTSTART;VALUE=DATE`；
-- 支持 `UID`、`DTSTART`、`DTEND`、`DURATION`、`SUMMARY`、`DESCRIPTION`、`LOCATION`；
-- 支持 `STATUS`、`URL`、`CATEGORIES`、`CREATED`、`LAST-MODIFIED`、`SEQUENCE` 等常用元数据；
-- 支持 `RRULE` 中 `FREQ`、`INTERVAL`、`COUNT`、`UNTIL`、`BYDAY`、`BYMONTHDAY`、`BYMONTH`；
-- 支持 `DAILY`、`WEEKLY`、`MONTHLY`、`YEARLY` 四类常见重复频率；
-- 支持 `RDATE` 追加日期和 `EXDATE` 排除日期；
-- 支持 `VTODO` 任务的 `DUE`、`COMPLETED`、`STATUS`、`PRIORITY`、`PERCENT-COMPLETE`、`RELATED-TO`、`CATEGORIES` 等字段；
-- 支持打开任务、已完成任务、逾期任务、指定日期到期任务、高优先级任务查询；
-- 支持 `VFREEBUSY` 的 `BUSY`、`BUSY-TENTATIVE`、`BUSY-UNAVAILABLE`、`FREE` 时间段；
-- 支持忙碌窗口查询、指定时刻忙碌判断和后续忙碌时间段查询；
-- 提供 occurrence 展开 API、按日期查询 API、后续事件查询 API、验证诊断 API；
-- 提供 JSON 导出、基础 ICS 导出、CLI 示例和可运行 example。
+## 技术路线
 
-## 使用方法
+项目按模块分层实现：`types.mbt` 定义领域模型，`parser.mbt` 负责 ICS 折行展开和组件解析，`datetime.mbt` / `duration.mbt` / `rrule.mbt` 提供日期时间、持续时间和重复规则能力，`query.mbt` 提供事件、任务和忙碌时间查询，`validation.mbt` 输出可分级诊断，`export.mbt` 提供 JSON 和 ICS 导出。所有错误使用类型化结果返回，便于命令行工具和上层应用稳定处理。
 
-发布后可通过 Mooncakes 安装：
+## 验收证据
 
-```bash
-moon add ciqingweiyang/mooncal
-```
+本地可运行 `moon add ciqingweiyang/mooncal` 安装；验收命令包括 `moon check`、`moon build`、`moon test`、`moon run cmd/main`、`moon run cmd/main -- --json`、`moon run examples/basic`。当前 `moon check`、`moon build`、`moon test`、`moon check --deny-warn`、`moon test --deny-warn`、`moon fmt --check`、`moon info`、命令行示例和基础示例均通过；测试结果为 `Total tests: 82, passed: 82, failed: 0.`；本地统计约 4,189 行有效 MoonBit 代码，达到活动说明参考规模区间。
 
-本地开发和验收可运行：
+## 边界与合规
 
-```bash
-moon check
-moon build
-moon test
-moon run cmd/main
-moon run cmd/main -- --json
-moon run examples/basic
-```
-
-最小使用示例：
-
-```moonbit
-match @mooncal.parse(@mooncal.sample_ics) {
-  Ok(calendar) => {
-    let from = @mooncal.DateTime(2026, 8, 1)
-    let until = @mooncal.DateTime(2026, 8, 31)
-    match @mooncal.occurrences_between(calendar, from, until, limit=32) {
-      Ok(items) => println(@mooncal.occurrences_to_json(items))
-      Err(err) => println(@mooncal.error_to_text(err))
-    }
-  }
-  Err(err) => println(@mooncal.error_to_text(err))
-}
-```
-
-## 验收准备情况
-
-- MoonBit 为主要实现语言；
-- README 已说明项目用途、功能范围、安装方法、CLI 和 API；
-- 提供 `examples/basic` 可运行示例；
-- 配置 GitHub Actions CI；
-- 提供 82 个可运行测试；
-- 本地 `moon check`、`moon build`、`moon test` 已通过；
-- 当前测试结果为 `Total tests: 82, passed: 82, failed: 0`；
-- 当前本地统计约 4,189 行有效 MoonBit 代码，达到活动说明 4,000 到 10,000 行参考规模区间；
-- 仓库提交记录可追踪，已保留多次有意义提交；
-- 功能边界和非目标已在 README 中说明；
-- 项目许可证为 Apache-2.0；
-- 未复制第三方代码或素材，测试 fixture 自行构造。
-
-## 原创性与撞车检查
-
-MoonCal 是原创 MoonBit 项目，不是对其他语言库的移植。项目参考公开 iCalendar 标准 RFC 5545 的格式和概念说明，但没有复制其他项目代码。
-
-截至 2026-08-17，已检索 Mooncakes 与 GitHub 公开结果，未发现明显重复的 MoonBit 原生 iCalendar / ICS 项目同时覆盖事件解析、重复规则展开、任务处理、空闲忙碌时间段查询、验证诊断、JSON/ICS 导出和可运行测试。其他生态中存在类似能力的库，但 MoonCal 的价值在于为 MoonBit 生态提供原生、轻量、可测试、可发布的日历数据基础能力。
-
-## 后续维护计划
-
-- 补充 `VTIMEZONE` 与更完整的时区处理；
-- 增加更多高级 RRULE 组合，例如 `BYSETPOS`、`WKST` 和序数星期；
-- 增加 `VALARM` 提醒组件解析；
-- 增加从文件读取的 CLI 能力；
-- 增加更丰富的错误定位信息；
-- 持续扩充真实世界 `.ics` 样例测试；
-- 在 Mooncakes 发布后维护版本发布记录和 changelog。
-
-## 开源合规说明
-
-本项目使用 Apache-2.0 许可证。代码、测试数据和文档均为原创编写；项目没有引入需要额外声明的第三方代码或素材。
+MoonCal 当前不做 CalDAV 网络同步、完整时区数据库、会议邀请回复状态同步和超大文件流式解析，后续计划补充 `VTIMEZONE`、高级 `RRULE`、`VALARM`、文件输入 CLI 和更多真实世界 `.ics` 样例。项目为原创 MoonBit 实现，只参考公开 iCalendar 标准 RFC 5545 的格式和概念说明，没有复制第三方项目代码或素材；测试样例自行构造，许可证为 Apache-2.0。
