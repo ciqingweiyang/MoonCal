@@ -219,8 +219,415 @@ fn sort_occurrences(values : Array[Occurrence]) -> Unit {
 }
 
 ///|
+pub fn task_is_completed(task : Task) -> Bool {
+  if task.completed is Some(_) {
+    return true
+  }
+  if task.status is Some(status) {
+    if status == "COMPLETED" {
+      return true
+    }
+  }
+  match task.percent_complete {
+    Some(value) => value >= 100
+    None => false
+  }
+}
+
+///|
+pub fn task_is_cancelled(task : Task) -> Bool {
+  task.status == Some("CANCELLED")
+}
+
+///|
+pub fn task_is_in_process(task : Task) -> Bool {
+  task.status == Some("IN-PROCESS")
+}
+
+///|
+pub fn task_is_open(task : Task) -> Bool {
+  !task_is_completed(task) && !task_is_cancelled(task)
+}
+
+///|
+pub fn task_is_overdue(task : Task, as_of : DateTime) -> Bool {
+  if !task_is_open(task) {
+    return false
+  }
+  match task.due {
+    Some(due) => due.before(as_of)
+    None => false
+  }
+}
+
+///|
+pub fn task_due_on_date(task : Task, date : DateTime) -> Bool {
+  match task.due {
+    Some(due) => due.same_day(date)
+    None => false
+  }
+}
+
+///|
+pub fn task_due_between(task : Task, from : DateTime, until : DateTime) -> Bool {
+  match task.due {
+    Some(due) => !due.before(from) && !due.after(until)
+    None => false
+  }
+}
+
+///|
+pub fn find_task(calendar : Calendar, uid : String) -> Task? {
+  for task in calendar.tasks {
+    if task.uid == uid {
+      return Some(task)
+    }
+  }
+  None
+}
+
+///|
+pub fn open_tasks(calendar : Calendar) -> Array[Task] {
+  let result : Array[Task] = []
+  for task in calendar.tasks {
+    if task_is_open(task) {
+      result.push(task)
+    }
+  }
+  sort_tasks_by_due(result)
+  result
+}
+
+///|
+pub fn completed_tasks(calendar : Calendar) -> Array[Task] {
+  let result : Array[Task] = []
+  for task in calendar.tasks {
+    if task_is_completed(task) {
+      result.push(task)
+    }
+  }
+  sort_tasks_by_due(result)
+  result
+}
+
+///|
+pub fn cancelled_tasks(calendar : Calendar) -> Array[Task] {
+  let result : Array[Task] = []
+  for task in calendar.tasks {
+    if task_is_cancelled(task) {
+      result.push(task)
+    }
+  }
+  sort_tasks_by_due(result)
+  result
+}
+
+///|
+pub fn overdue_tasks(calendar : Calendar, as_of : DateTime) -> Array[Task] {
+  let result : Array[Task] = []
+  for task in calendar.tasks {
+    if task_is_overdue(task, as_of) {
+      result.push(task)
+    }
+  }
+  sort_tasks_by_due(result)
+  result
+}
+
+///|
+pub fn tasks_due_between(
+  calendar : Calendar,
+  from : DateTime,
+  until : DateTime,
+) -> Array[Task] {
+  let result : Array[Task] = []
+  for task in calendar.tasks {
+    if task_due_between(task, from, until) {
+      result.push(task)
+    }
+  }
+  sort_tasks_by_due(result)
+  result
+}
+
+///|
+pub fn tasks_due_on_date(calendar : Calendar, date : DateTime) -> Array[Task] {
+  let result : Array[Task] = []
+  for task in calendar.tasks {
+    if task_due_on_date(task, date) {
+      result.push(task)
+    }
+  }
+  sort_tasks_by_due(result)
+  result
+}
+
+///|
+pub fn high_priority_tasks(calendar : Calendar) -> Array[Task] {
+  let result : Array[Task] = []
+  for task in calendar.tasks {
+    if task.priority is Some(value) {
+      if value > 0 && value <= 4 {
+        result.push(task)
+      }
+    }
+  }
+  sort_tasks_by_due(result)
+  result
+}
+
+///|
+pub fn summarize_tasks(calendar : Calendar) -> TaskSummary {
+  let mut open_task_count = 0
+  let mut completed_task_count = 0
+  let mut in_process_task_count = 0
+  let mut cancelled_task_count = 0
+  let mut high_priority_task_count = 0
+  let mut due_task_count = 0
+  let mut earliest_due : DateTime? = None
+  let mut latest_due : DateTime? = None
+  for task in calendar.tasks {
+    if task_is_open(task) {
+      open_task_count = open_task_count + 1
+    }
+    if task_is_completed(task) {
+      completed_task_count = completed_task_count + 1
+    }
+    if task_is_in_process(task) {
+      in_process_task_count = in_process_task_count + 1
+    }
+    if task_is_cancelled(task) {
+      cancelled_task_count = cancelled_task_count + 1
+    }
+    if task.priority is Some(value) {
+      if value > 0 && value <= 4 {
+        high_priority_task_count = high_priority_task_count + 1
+      }
+    }
+    if task.due is Some(due) {
+      due_task_count = due_task_count + 1
+      earliest_due = min_datetime(earliest_due, due)
+      latest_due = max_datetime(latest_due, due)
+    }
+  }
+  TaskSummary::{
+    task_count: calendar.tasks.length(),
+    open_task_count,
+    completed_task_count,
+    in_process_task_count,
+    cancelled_task_count,
+    high_priority_task_count,
+    due_task_count,
+    earliest_due,
+    latest_due,
+  }
+}
+
+///|
+pub fn freebusy_period_overlaps(
+  period : FreeBusyPeriod,
+  from : DateTime,
+  until : DateTime,
+) -> Bool {
+  !period.end.before(from) && !period.start.after(until)
+}
+
+///|
+pub fn freebusy_period_contains(
+  period : FreeBusyPeriod,
+  moment : DateTime,
+) -> Bool {
+  !moment.before(period.start) && moment.before(period.end)
+}
+
+///|
+pub fn freebusy_is_busy_type(period : FreeBusyPeriod) -> Bool {
+  period.busy_type == "BUSY" ||
+  period.busy_type == "BUSY-TENTATIVE" ||
+  period.busy_type == "BUSY-UNAVAILABLE"
+}
+
+///|
+pub fn freebusy_periods_between(
+  calendar : Calendar,
+  from : DateTime,
+  until : DateTime,
+) -> Array[FreeBusyPeriod] {
+  let result : Array[FreeBusyPeriod] = []
+  for item in calendar.freebusy {
+    for period in item.periods {
+      if freebusy_period_overlaps(period, from, until) {
+        result.push(period)
+      }
+    }
+  }
+  sort_freebusy_periods(result)
+  result
+}
+
+///|
+pub fn busy_periods_between(
+  calendar : Calendar,
+  from : DateTime,
+  until : DateTime,
+) -> Array[FreeBusyPeriod] {
+  let result : Array[FreeBusyPeriod] = []
+  for period in freebusy_periods_between(calendar, from, until) {
+    if freebusy_is_busy_type(period) {
+      result.push(period)
+    }
+  }
+  result
+}
+
+///|
+pub fn free_periods_between(
+  calendar : Calendar,
+  from : DateTime,
+  until : DateTime,
+) -> Array[FreeBusyPeriod] {
+  let result : Array[FreeBusyPeriod] = []
+  for period in freebusy_periods_between(calendar, from, until) {
+    if period.busy_type == "FREE" {
+      result.push(period)
+    }
+  }
+  result
+}
+
+///|
+pub fn time_is_busy(calendar : Calendar, moment : DateTime) -> Bool {
+  for item in calendar.freebusy {
+    for period in item.periods {
+      if freebusy_is_busy_type(period) &&
+        freebusy_period_contains(period, moment) {
+        return true
+      }
+    }
+  }
+  false
+}
+
+///|
+pub fn next_busy_periods(
+  calendar : Calendar,
+  after : DateTime,
+  limit? : Int = 10,
+) -> Array[FreeBusyPeriod] {
+  let horizon = after.add_days(366)
+  let result : Array[FreeBusyPeriod] = []
+  for period in busy_periods_between(calendar, after, horizon) {
+    if !period.end.before(after) && result.length() < limit {
+      result.push(period)
+    }
+  }
+  result
+}
+
+///|
+pub fn summarize_freebusy(calendar : Calendar) -> FreeBusySummary {
+  let mut period_count = 0
+  let mut busy_period_count = 0
+  let mut tentative_period_count = 0
+  let mut unavailable_period_count = 0
+  let mut free_period_count = 0
+  let mut earliest_start : DateTime? = None
+  let mut latest_end : DateTime? = None
+  for item in calendar.freebusy {
+    for period in item.periods {
+      period_count = period_count + 1
+      if period.busy_type == "BUSY" {
+        busy_period_count = busy_period_count + 1
+      } else if period.busy_type == "BUSY-TENTATIVE" {
+        tentative_period_count = tentative_period_count + 1
+      } else if period.busy_type == "BUSY-UNAVAILABLE" {
+        unavailable_period_count = unavailable_period_count + 1
+      } else if period.busy_type == "FREE" {
+        free_period_count = free_period_count + 1
+      }
+      earliest_start = min_datetime(earliest_start, period.start)
+      latest_end = max_datetime(latest_end, period.end)
+    }
+  }
+  FreeBusySummary::{
+    component_count: calendar.freebusy.length(),
+    period_count,
+    busy_period_count,
+    tentative_period_count,
+    unavailable_period_count,
+    free_period_count,
+    earliest_start,
+    latest_end,
+  }
+}
+
+///|
+fn sort_tasks_by_due(values : Array[Task]) -> Unit {
+  for i in 1..<values.length() {
+    let current = values[i]
+    let mut j = i
+    while j > 0 && task_compare_by_due(current, values[j - 1]) < 0 {
+      values[j] = values[j - 1]
+      j = j - 1
+    }
+    values[j] = current
+  }
+}
+
+///|
+fn task_compare_by_due(left : Task, right : Task) -> Int {
+  match (left.due, right.due) {
+    (Some(a), Some(b)) => a.compare(b)
+    (Some(_), None) => -1
+    (None, Some(_)) => 1
+    (None, None) => left.uid.compare(right.uid)
+  }
+}
+
+///|
+fn sort_freebusy_periods(values : Array[FreeBusyPeriod]) -> Unit {
+  for i in 1..<values.length() {
+    let current = values[i]
+    let mut j = i
+    while j > 0 && current.start.before(values[j - 1].start) {
+      values[j] = values[j - 1]
+      j = j - 1
+    }
+    values[j] = current
+  }
+}
+
+///|
+fn min_datetime(current : DateTime?, candidate : DateTime) -> DateTime? {
+  match current {
+    Some(value) =>
+      if candidate.before(value) {
+        Some(candidate)
+      } else {
+        Some(value)
+      }
+    None => Some(candidate)
+  }
+}
+
+///|
+fn max_datetime(current : DateTime?, candidate : DateTime) -> DateTime? {
+  match current {
+    Some(value) =>
+      if candidate.after(value) {
+        Some(candidate)
+      } else {
+        Some(value)
+      }
+    None => Some(candidate)
+  }
+}
+
+///|
 pub fn summarize(calendar : Calendar) -> CalendarSummary {
   let diagnostics = validate_calendar(calendar)
+  let task_summary = summarize_tasks(calendar)
+  let freebusy_summary = summarize_freebusy(calendar)
   let mut recurring_event_count = 0
   let mut all_day_event_count = 0
   let mut earliest : DateTime? = None
@@ -232,29 +639,34 @@ pub fn summarize(calendar : Calendar) -> CalendarSummary {
     if event.start.is_date {
       all_day_event_count = all_day_event_count + 1
     }
-    earliest = match earliest {
-      Some(value) =>
-        if event.start.before(value) {
-          Some(event.start)
-        } else {
-          Some(value)
-        }
-      None => Some(event.start)
+    earliest = min_datetime(earliest, event.start)
+    latest = max_datetime(latest, event.start)
+  }
+  for task in calendar.tasks {
+    if task.start is Some(start) {
+      earliest = min_datetime(earliest, start)
+      latest = max_datetime(latest, start)
     }
-    latest = match latest {
-      Some(value) =>
-        if event.start.after(value) {
-          Some(event.start)
-        } else {
-          Some(value)
-        }
-      None => Some(event.start)
+    if task.due is Some(due) {
+      earliest = min_datetime(earliest, due)
+      latest = max_datetime(latest, due)
+    }
+  }
+  for item in calendar.freebusy {
+    for period in item.periods {
+      earliest = min_datetime(earliest, period.start)
+      latest = max_datetime(latest, period.end)
     }
   }
   CalendarSummary::{
     event_count: calendar.events.length(),
     recurring_event_count,
     all_day_event_count,
+    task_count: task_summary.task_count,
+    open_task_count: task_summary.open_task_count,
+    completed_task_count: task_summary.completed_task_count,
+    blocked_time_count: freebusy_summary.component_count,
+    blocked_period_count: freebusy_summary.period_count,
     earliest,
     latest,
     diagnostics,

@@ -7,6 +7,7 @@ pub(all) enum MoonCalError {
   InvalidRRule(value~ : String, message~ : String)
   InvalidCalendar(message~ : String)
   MissingEventField(field~ : String)
+  MissingTaskField(field~ : String)
   UnsupportedFeature(feature~ : String)
   LimitExceeded(limit~ : Int)
 } derive(Eq, @debug.Debug)
@@ -100,11 +101,56 @@ pub(all) struct Event {
 } derive(@debug.Debug)
 
 ///|
+/// A VTODO record with common task-tracking fields.
+pub(all) struct Task {
+  uid : String
+  start : DateTime?
+  due : DateTime?
+  completed : DateTime?
+  created : DateTime?
+  last_modified : DateTime?
+  summary : String
+  description : String?
+  status : String?
+  priority : Int?
+  percent_complete : Int?
+  categories : Array[String]
+  url : String?
+  related_to : Array[String]
+  raw : Array[IcsProperty]
+} derive(@debug.Debug)
+
+///|
+/// One FREEBUSY period inside a VFREEBUSY component.
+pub(all) struct FreeBusyPeriod {
+  start : DateTime
+  end : DateTime
+  busy_type : String
+} derive(Eq, @debug.Debug)
+
+///|
+/// A VFREEBUSY record used to describe blocked or available time windows.
+pub(all) struct FreeBusy {
+  uid : String?
+  start : DateTime?
+  end : DateTime?
+  dtstamp : DateTime?
+  organizer : String?
+  attendees : Array[String]
+  comments : Array[String]
+  url : String?
+  periods : Array[FreeBusyPeriod]
+  raw : Array[IcsProperty]
+} derive(@debug.Debug)
+
+///|
 /// A parsed VCALENDAR document.
 pub(all) struct Calendar {
   version : String?
   prodid : String?
   events : Array[Event]
+  tasks : Array[Task]
+  freebusy : Array[FreeBusy]
   properties : Array[IcsProperty]
 } derive(@debug.Debug)
 
@@ -131,7 +177,39 @@ pub(all) struct CalendarSummary {
   event_count : Int
   recurring_event_count : Int
   all_day_event_count : Int
+  task_count : Int
+  open_task_count : Int
+  completed_task_count : Int
+  blocked_time_count : Int
+  blocked_period_count : Int
   earliest : DateTime?
   latest : DateTime?
   diagnostics : Array[Diagnostic]
+} derive(@debug.Debug)
+
+///|
+/// Task-focused summary that callers can compute independently from CLI output.
+pub(all) struct TaskSummary {
+  task_count : Int
+  open_task_count : Int
+  completed_task_count : Int
+  in_process_task_count : Int
+  cancelled_task_count : Int
+  high_priority_task_count : Int
+  due_task_count : Int
+  earliest_due : DateTime?
+  latest_due : DateTime?
+} derive(@debug.Debug)
+
+///|
+/// Availability-focused summary over parsed VFREEBUSY data.
+pub(all) struct FreeBusySummary {
+  component_count : Int
+  period_count : Int
+  busy_period_count : Int
+  tentative_period_count : Int
+  unavailable_period_count : Int
+  free_period_count : Int
+  earliest_start : DateTime?
+  latest_end : DateTime?
 } derive(@debug.Debug)

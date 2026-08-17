@@ -8,9 +8,15 @@ import {
 // Values
 pub fn analyze(String) -> Result[CalendarSummary, MoonCalError]
 
+pub fn busy_periods_between(Calendar, DateTime, DateTime) -> Array[FreeBusyPeriod]
+
 pub fn calendar_to_ics(Calendar) -> String
 
 pub fn calendar_to_json(Calendar) -> String
+
+pub fn cancelled_tasks(Calendar) -> Array[Task]
+
+pub fn completed_tasks(Calendar) -> Array[Task]
 
 pub fn days_in_month(Int, Int) -> Int
 
@@ -38,11 +44,37 @@ pub fn expand_event_between(Event, DateTime, DateTime, limit? : Int) -> Result[A
 
 pub fn find_event(Calendar, String) -> Event?
 
+pub fn find_task(Calendar, String) -> Task?
+
+pub fn free_periods_between(Calendar, DateTime, DateTime) -> Array[FreeBusyPeriod]
+
+pub fn freebusy_is_busy_type(FreeBusyPeriod) -> Bool
+
+pub fn freebusy_period_contains(FreeBusyPeriod, DateTime) -> Bool
+
+pub fn freebusy_period_overlaps(FreeBusyPeriod, DateTime, DateTime) -> Bool
+
+pub fn freebusy_period_to_ics(FreeBusyPeriod) -> String
+
+pub fn freebusy_period_to_json(FreeBusyPeriod) -> String
+
+pub fn freebusy_periods_between(Calendar, DateTime, DateTime) -> Array[FreeBusyPeriod]
+
+pub fn freebusy_summary_to_json(FreeBusySummary) -> String
+
+pub fn freebusy_to_ics(FreeBusy) -> String
+
+pub fn freebusy_to_json(FreeBusy) -> String
+
 pub fn frequency_to_string(Frequency) -> String
+
+pub fn high_priority_tasks(Calendar) -> Array[Task]
 
 pub fn is_leap_year(Int) -> Bool
 
 pub fn is_valid_date(Int, Int, Int) -> Bool
+
+pub fn next_busy_periods(Calendar, DateTime, limit? : Int) -> Array[FreeBusyPeriod]
 
 pub fn next_occurrences(Calendar, DateTime, limit? : Int) -> Result[Array[Occurrence], MoonCalError]
 
@@ -51,6 +83,10 @@ pub fn occurrences_between(Calendar, DateTime, DateTime, limit? : Int) -> Result
 pub fn occurrences_on_date(Calendar, DateTime, limit? : Int) -> Result[Array[Occurrence], MoonCalError]
 
 pub fn occurrences_to_json(Array[Occurrence]) -> String
+
+pub fn open_tasks(Calendar) -> Array[Task]
+
+pub fn overdue_tasks(Calendar, DateTime) -> Array[Task]
 
 pub let package_name : String
 
@@ -64,6 +100,8 @@ pub fn parse_duration(String) -> Result[Duration, MoonCalError]
 
 pub fn parse_event(Array[IcsProperty]) -> Result[Event, MoonCalError]
 
+pub fn parse_freebusy(Array[IcsProperty]) -> Result[FreeBusy, MoonCalError]
+
 pub fn parse_frequency(String) -> Frequency?
 
 pub fn parse_properties(String) -> Result[Array[IcsProperty], MoonCalError]
@@ -74,6 +112,8 @@ pub fn parse_rrule(String) -> Result[RRule, MoonCalError]
 
 pub fn parse_rule(String) -> Result[RRule, MoonCalError]
 
+pub fn parse_task(Array[IcsProperty]) -> Result[Task, MoonCalError]
+
 pub fn parse_weekday(String) -> Weekday?
 
 pub fn rrule_to_ics(RRule) -> String
@@ -82,9 +122,39 @@ pub let sample_ics : String
 
 pub fn summarize(Calendar) -> CalendarSummary
 
+pub fn summarize_freebusy(Calendar) -> FreeBusySummary
+
+pub fn summarize_tasks(Calendar) -> TaskSummary
+
 pub fn summary_to_json(CalendarSummary) -> String
 
 pub fn summary_to_text(CalendarSummary) -> String
+
+pub fn task_due_between(Task, DateTime, DateTime) -> Bool
+
+pub fn task_due_on_date(Task, DateTime) -> Bool
+
+pub fn task_is_cancelled(Task) -> Bool
+
+pub fn task_is_completed(Task) -> Bool
+
+pub fn task_is_in_process(Task) -> Bool
+
+pub fn task_is_open(Task) -> Bool
+
+pub fn task_is_overdue(Task, DateTime) -> Bool
+
+pub fn task_summary_to_json(TaskSummary) -> String
+
+pub fn task_to_ics(Task) -> String
+
+pub fn task_to_json(Task) -> String
+
+pub fn tasks_due_between(Calendar, DateTime, DateTime) -> Array[Task]
+
+pub fn tasks_due_on_date(Calendar, DateTime) -> Array[Task]
+
+pub fn time_is_busy(Calendar, DateTime) -> Bool
 
 pub fn unescape_text(String) -> String
 
@@ -93,6 +163,10 @@ pub fn unfold_lines(String) -> Result[Array[(Int, String)], MoonCalError]
 pub fn validate_calendar(Calendar) -> Array[Diagnostic]
 
 pub fn validate_event(Event) -> Array[Diagnostic]
+
+pub fn validate_freebusy(FreeBusy) -> Array[Diagnostic]
+
+pub fn validate_task(Task) -> Array[Diagnostic]
 
 pub fn weekday_to_string(Weekday) -> String
 
@@ -103,6 +177,8 @@ pub(all) struct Calendar {
   version : String?
   prodid : String?
   events : Array[Event]
+  tasks : Array[Task]
+  freebusy : Array[FreeBusy]
   properties : Array[IcsProperty]
 } derive(@debug.Debug)
 
@@ -110,6 +186,11 @@ pub(all) struct CalendarSummary {
   event_count : Int
   recurring_event_count : Int
   all_day_event_count : Int
+  task_count : Int
+  open_task_count : Int
+  completed_task_count : Int
+  blocked_time_count : Int
+  blocked_period_count : Int
   earliest : DateTime?
   latest : DateTime?
   diagnostics : Array[Diagnostic]
@@ -186,6 +267,36 @@ pub(all) struct Event {
   raw : Array[IcsProperty]
 } derive(@debug.Debug)
 
+pub(all) struct FreeBusy {
+  uid : String?
+  start : DateTime?
+  end : DateTime?
+  dtstamp : DateTime?
+  organizer : String?
+  attendees : Array[String]
+  comments : Array[String]
+  url : String?
+  periods : Array[FreeBusyPeriod]
+  raw : Array[IcsProperty]
+} derive(@debug.Debug)
+
+pub(all) struct FreeBusyPeriod {
+  start : DateTime
+  end : DateTime
+  busy_type : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct FreeBusySummary {
+  component_count : Int
+  period_count : Int
+  busy_period_count : Int
+  tentative_period_count : Int
+  unavailable_period_count : Int
+  free_period_count : Int
+  earliest_start : DateTime?
+  latest_end : DateTime?
+} derive(@debug.Debug)
+
 pub(all) enum Frequency {
   Daily
   Weekly
@@ -207,6 +318,7 @@ pub(all) enum MoonCalError {
   InvalidRRule(value~ : String, message~ : String)
   InvalidCalendar(message~ : String)
   MissingEventField(field~ : String)
+  MissingTaskField(field~ : String)
   UnsupportedFeature(feature~ : String)
   LimitExceeded(limit~ : Int)
 } derive(Eq, @debug.Debug)
@@ -228,6 +340,36 @@ pub(all) struct RRule {
   bymonth : Array[Int]
 } derive(Eq, @debug.Debug)
 pub fn RRule::RRule(Frequency, interval? : Int, count? : Int, until? : DateTime, byday? : Array[Weekday], bymonthday? : Array[Int], bymonth? : Array[Int]) -> Self
+
+pub(all) struct Task {
+  uid : String
+  start : DateTime?
+  due : DateTime?
+  completed : DateTime?
+  created : DateTime?
+  last_modified : DateTime?
+  summary : String
+  description : String?
+  status : String?
+  priority : Int?
+  percent_complete : Int?
+  categories : Array[String]
+  url : String?
+  related_to : Array[String]
+  raw : Array[IcsProperty]
+} derive(@debug.Debug)
+
+pub(all) struct TaskSummary {
+  task_count : Int
+  open_task_count : Int
+  completed_task_count : Int
+  in_process_task_count : Int
+  cancelled_task_count : Int
+  high_priority_task_count : Int
+  due_task_count : Int
+  earliest_due : DateTime?
+  latest_due : DateTime?
+} derive(@debug.Debug)
 
 pub(all) enum Weekday {
   MO

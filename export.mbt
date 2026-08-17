@@ -5,6 +5,11 @@ pub fn summary_to_text(summary : CalendarSummary) -> String {
   b.write_string("events: \{summary.event_count}\n")
   b.write_string("recurring: \{summary.recurring_event_count}\n")
   b.write_string("all_day: \{summary.all_day_event_count}\n")
+  b.write_string("tasks: \{summary.task_count}\n")
+  b.write_string("open_tasks: \{summary.open_task_count}\n")
+  b.write_string("completed_tasks: \{summary.completed_task_count}\n")
+  b.write_string("freebusy: \{summary.blocked_time_count}\n")
+  b.write_string("freebusy_periods: \{summary.blocked_period_count}\n")
   b.write_string("earliest: \{option_datetime_to_text(summary.earliest)}\n")
   b.write_string("latest: \{option_datetime_to_text(summary.latest)}\n")
   if summary.diagnostics.is_empty() {
@@ -28,6 +33,7 @@ pub fn error_to_text(err : MoonCalError) -> String {
     InvalidRRule(value~, message~) => "invalid RRULE '\{value}': \{message}"
     InvalidCalendar(message~) => "invalid calendar: \{message}"
     MissingEventField(field~) => "missing required VEVENT field: \{field}"
+    MissingTaskField(field~) => "missing required VTODO field: \{field}"
     UnsupportedFeature(feature~) => "unsupported feature: \{feature}"
     LimitExceeded(limit~) => "expansion limit exceeded: \{limit}"
   }
@@ -40,6 +46,11 @@ pub fn summary_to_json(summary : CalendarSummary) -> String {
   b.write_string("\"event_count\":\{summary.event_count},")
   b.write_string("\"recurring_event_count\":\{summary.recurring_event_count},")
   b.write_string("\"all_day_event_count\":\{summary.all_day_event_count},")
+  b.write_string("\"task_count\":\{summary.task_count},")
+  b.write_string("\"open_task_count\":\{summary.open_task_count},")
+  b.write_string("\"completed_task_count\":\{summary.completed_task_count},")
+  b.write_string("\"freebusy_count\":\{summary.blocked_time_count},")
+  b.write_string("\"freebusy_period_count\":\{summary.blocked_period_count},")
   b.write_string("\"earliest\":\{option_datetime_to_json(summary.earliest)},")
   b.write_string("\"latest\":\{option_datetime_to_json(summary.latest)},")
   b.write_string("\"diagnostics\":[")
@@ -68,6 +79,22 @@ pub fn calendar_to_json(calendar : Calendar) -> String {
     }
     b.write_string(event_to_json(event))
   }
+  b.write_string("],")
+  b.write_string("\"tasks\":[")
+  for i, task in calendar.tasks {
+    if i > 0 {
+      b.write_string(",")
+    }
+    b.write_string(task_to_json(task))
+  }
+  b.write_string("],")
+  b.write_string("\"freebusy\":[")
+  for i, item in calendar.freebusy {
+    if i > 0 {
+      b.write_string(",")
+    }
+    b.write_string(freebusy_to_json(item))
+  }
   b.write_string("]}")
   b.to_string()
 }
@@ -87,6 +114,122 @@ pub fn event_to_json(event : Event) -> String {
   b.write_string("\"categories\":\{string_array_to_json(event.categories)},")
   b.write_string(
     "\"recurring\":\{if event_is_recurring(event) { "true" } else { "false" }}",
+  )
+  b.write_string("}")
+  b.to_string()
+}
+
+///|
+pub fn task_to_json(task : Task) -> String {
+  let b = StringBuilder()
+  b.write_string("{")
+  b.write_string("\"uid\":\"\{escape_json(task.uid)}\",")
+  b.write_string("\"start\":\{option_datetime_to_json(task.start)},")
+  b.write_string("\"due\":\{option_datetime_to_json(task.due)},")
+  b.write_string("\"completed\":\{option_datetime_to_json(task.completed)},")
+  b.write_string("\"created\":\{option_datetime_to_json(task.created)},")
+  b.write_string(
+    "\"last_modified\":\{option_datetime_to_json(task.last_modified)},",
+  )
+  b.write_string("\"summary\":\"\{escape_json(task.summary)}\",")
+  b.write_string("\"description\":\{option_string_to_json(task.description)},")
+  b.write_string("\"status\":\{option_string_to_json(task.status)},")
+  b.write_string("\"priority\":\{option_int_to_json(task.priority)},")
+  b.write_string(
+    "\"percent_complete\":\{option_int_to_json(task.percent_complete)},",
+  )
+  b.write_string("\"categories\":\{string_array_to_json(task.categories)},")
+  b.write_string("\"url\":\{option_string_to_json(task.url)},")
+  b.write_string("\"related_to\":\{string_array_to_json(task.related_to)},")
+  b.write_string(
+    "\"open\":\{if task_is_open(task) { "true" } else { "false" }},",
+  )
+  b.write_string(
+    "\"completed_state\":\{if task_is_completed(task) { "true" } else { "false" }}",
+  )
+  b.write_string("}")
+  b.to_string()
+}
+
+///|
+pub fn freebusy_to_json(item : FreeBusy) -> String {
+  let b = StringBuilder()
+  b.write_string("{")
+  b.write_string("\"uid\":\{option_string_to_json(item.uid)},")
+  b.write_string("\"start\":\{option_datetime_to_json(item.start)},")
+  b.write_string("\"end\":\{option_datetime_to_json(item.end)},")
+  b.write_string("\"dtstamp\":\{option_datetime_to_json(item.dtstamp)},")
+  b.write_string("\"organizer\":\{option_string_to_json(item.organizer)},")
+  b.write_string("\"attendees\":\{string_array_to_json(item.attendees)},")
+  b.write_string("\"comments\":\{string_array_to_json(item.comments)},")
+  b.write_string("\"url\":\{option_string_to_json(item.url)},")
+  b.write_string("\"periods\":[")
+  for i, period in item.periods {
+    if i > 0 {
+      b.write_string(",")
+    }
+    b.write_string(freebusy_period_to_json(period))
+  }
+  b.write_string("]}")
+  b.to_string()
+}
+
+///|
+pub fn freebusy_period_to_json(period : FreeBusyPeriod) -> String {
+  let b = StringBuilder()
+  b.write_string("{")
+  b.write_string("\"start\":\"\{escape_json(period.start.format())}\",")
+  b.write_string("\"end\":\"\{escape_json(period.end.format())}\",")
+  b.write_string("\"busy_type\":\"\{escape_json(period.busy_type)}\",")
+  b.write_string(
+    "\"busy\":\{if freebusy_is_busy_type(period) { "true" } else { "false" }}",
+  )
+  b.write_string("}")
+  b.to_string()
+}
+
+///|
+pub fn task_summary_to_json(summary : TaskSummary) -> String {
+  let b = StringBuilder()
+  b.write_string("{")
+  b.write_string("\"task_count\":\{summary.task_count},")
+  b.write_string("\"open_task_count\":\{summary.open_task_count},")
+  b.write_string("\"completed_task_count\":\{summary.completed_task_count},")
+  b.write_string("\"in_process_task_count\":\{summary.in_process_task_count},")
+  b.write_string("\"cancelled_task_count\":\{summary.cancelled_task_count},")
+  b.write_string(
+    "\"high_priority_task_count\":\{summary.high_priority_task_count},",
+  )
+  b.write_string("\"due_task_count\":\{summary.due_task_count},")
+  b.write_string(
+    "\"earliest_due\":\{option_datetime_to_json(summary.earliest_due)},",
+  )
+  b.write_string(
+    "\"latest_due\":\{option_datetime_to_json(summary.latest_due)}",
+  )
+  b.write_string("}")
+  b.to_string()
+}
+
+///|
+pub fn freebusy_summary_to_json(summary : FreeBusySummary) -> String {
+  let b = StringBuilder()
+  b.write_string("{")
+  b.write_string("\"component_count\":\{summary.component_count},")
+  b.write_string("\"period_count\":\{summary.period_count},")
+  b.write_string("\"busy_period_count\":\{summary.busy_period_count},")
+  b.write_string(
+    "\"tentative_period_count\":\{summary.tentative_period_count},",
+  )
+  b.write_string(
+    "\"unavailable_period_count\":\{summary.unavailable_period_count},",
+  )
+  b.write_string("\"free_period_count\":\{summary.free_period_count},")
+  b.write_string(
+    "\"earliest_start\":\{option_datetime_to_json(summary.earliest_start)},",
+  )
+  b.write_string(
+    "\"latest_end\":\{option_datetime_to_json(summary.latest_end)}",
   )
   b.write_string("}")
   b.to_string()
@@ -123,6 +266,12 @@ pub fn calendar_to_ics(calendar : Calendar) -> String {
   )
   for event in calendar.events {
     b.write_string(event_to_ics(event))
+  }
+  for task in calendar.tasks {
+    b.write_string(task_to_ics(task))
+  }
+  for item in calendar.freebusy {
+    b.write_string(freebusy_to_ics(item))
   }
   b.write_string("END:VCALENDAR\r\n")
   b.to_string()
@@ -189,6 +338,99 @@ pub fn event_to_ics(event : Event) -> String {
 }
 
 ///|
+pub fn task_to_ics(task : Task) -> String {
+  let b = StringBuilder()
+  b.write_string("BEGIN:VTODO\r\n")
+  b.write_string("UID:\{escape_ics_text(task.uid)}\r\n")
+  if task.start is Some(start) {
+    write_datetime_property(b, "DTSTART", start)
+  }
+  if task.due is Some(due) {
+    write_datetime_property(b, "DUE", due)
+  }
+  if task.completed is Some(completed) {
+    write_datetime_property(b, "COMPLETED", completed)
+  }
+  if task.created is Some(created) {
+    write_datetime_property(b, "CREATED", created)
+  }
+  if task.last_modified is Some(last_modified) {
+    write_datetime_property(b, "LAST-MODIFIED", last_modified)
+  }
+  if !task.summary.is_empty() {
+    b.write_string("SUMMARY:\{escape_ics_text(task.summary)}\r\n")
+  }
+  if task.description is Some(description) {
+    b.write_string("DESCRIPTION:\{escape_ics_text(description)}\r\n")
+  }
+  if task.status is Some(status) {
+    b.write_string("STATUS:\{status}\r\n")
+  }
+  if task.priority is Some(priority) {
+    b.write_string("PRIORITY:\{priority}\r\n")
+  }
+  if task.percent_complete is Some(percent) {
+    b.write_string("PERCENT-COMPLETE:\{percent}\r\n")
+  }
+  if !task.categories.is_empty() {
+    b.write_string("CATEGORIES:\{string_array_to_ics(task.categories)}\r\n")
+  }
+  if task.url is Some(url) {
+    b.write_string("URL:\{url}\r\n")
+  }
+  for related in task.related_to {
+    b.write_string("RELATED-TO:\{escape_ics_text(related)}\r\n")
+  }
+  b.write_string("END:VTODO\r\n")
+  b.to_string()
+}
+
+///|
+pub fn freebusy_to_ics(item : FreeBusy) -> String {
+  let b = StringBuilder()
+  b.write_string("BEGIN:VFREEBUSY\r\n")
+  if item.uid is Some(uid) {
+    b.write_string("UID:\{escape_ics_text(uid)}\r\n")
+  }
+  if item.dtstamp is Some(dtstamp) {
+    write_datetime_property(b, "DTSTAMP", dtstamp)
+  }
+  if item.start is Some(start) {
+    write_datetime_property(b, "DTSTART", start)
+  }
+  if item.end is Some(end) {
+    write_datetime_property(b, "DTEND", end)
+  }
+  if item.organizer is Some(organizer) {
+    b.write_string("ORGANIZER:\{organizer}\r\n")
+  }
+  for attendee in item.attendees {
+    b.write_string("ATTENDEE:\{attendee}\r\n")
+  }
+  for comment in item.comments {
+    b.write_string("COMMENT:\{escape_ics_text(comment)}\r\n")
+  }
+  if item.url is Some(url) {
+    b.write_string("URL:\{url}\r\n")
+  }
+  for period in item.periods {
+    b.write_string(freebusy_period_to_ics(period))
+  }
+  b.write_string("END:VFREEBUSY\r\n")
+  b.to_string()
+}
+
+///|
+pub fn freebusy_period_to_ics(period : FreeBusyPeriod) -> String {
+  let param = if period.busy_type == "BUSY" {
+    ""
+  } else {
+    ";FBTYPE=\{period.busy_type}"
+  }
+  "FREEBUSY\{param}:\{period.start.to_ics_value()}/\{period.end.to_ics_value()}\r\n"
+}
+
+///|
 pub fn rrule_to_ics(rule : RRule) -> String {
   let parts : Array[String] = ["FREQ=\{frequency_to_string(rule.freq)}"]
   if rule.interval != 1 {
@@ -210,6 +452,19 @@ pub fn rrule_to_ics(rule : RRule) -> String {
     parts.push("BYMONTH=\{int_array_to_text(rule.bymonth)}")
   }
   parts.join(";")
+}
+
+///|
+fn write_datetime_property(
+  b : StringBuilder,
+  name : String,
+  value : DateTime,
+) -> Unit {
+  if value.is_date {
+    b.write_string("\{name};VALUE=DATE:\{value.to_ics_value()}\r\n")
+  } else {
+    b.write_string("\{name}:\{value.to_ics_value()}\r\n")
+  }
 }
 
 ///|
@@ -282,6 +537,14 @@ fn option_datetime_to_json(value : DateTime?) -> String {
 fn option_string_to_json(value : String?) -> String {
   match value {
     Some(text) => "\"\{escape_json(text)}\""
+    None => "null"
+  }
+}
+
+///|
+fn option_int_to_json(value : Int?) -> String {
+  match value {
+    Some(n) => "\{n}"
     None => "null"
   }
 }

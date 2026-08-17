@@ -2,8 +2,9 @@
 /// MoonCal is a small MoonBit-native iCalendar toolkit.
 ///
 /// The v1 surface intentionally focuses on reusable library behavior:
-/// parsing unfolded ICS properties, extracting VEVENT records, expanding
-/// common RRULE patterns, validating calendar shape, and exporting summaries.
+/// parsing unfolded ICS properties, extracting VEVENT/VTODO/VFREEBUSY records,
+/// expanding common RRULE patterns, validating calendar shape, and exporting
+/// summaries.
 pub let package_name : String = "ciqingweiyang/mooncal"
 
 ///|
@@ -26,6 +27,45 @@ pub let sample_ics : String =
   #|DTSTART;VALUE=DATE:20260820
   #|SUMMARY:MoonBit package release day
   #|END:VEVENT
+  #|BEGIN:VTODO
+  #|UID:demo-docs
+  #|DTSTART;VALUE=DATE:20260806
+  #|DUE;VALUE=DATE:20260818
+  #|SUMMARY:Prepare MoonCal README
+  #|STATUS:IN-PROCESS
+  #|PRIORITY:3
+  #|PERCENT-COMPLETE:60
+  #|CATEGORIES:MoonBit,Docs
+  #|RELATED-TO:demo-release
+  #|END:VTODO
+  #|BEGIN:VTODO
+  #|UID:demo-publish
+  #|DUE:20260820T100000Z
+  #|SUMMARY:Publish MoonCal package
+  #|STATUS:NEEDS-ACTION
+  #|PRIORITY:2
+  #|PERCENT-COMPLETE:0
+  #|CATEGORIES:MoonBit,Release
+  #|END:VTODO
+  #|BEGIN:VTODO
+  #|UID:demo-tests
+  #|COMPLETED:20260812T160000Z
+  #|SUMMARY:Run MoonCal acceptance tests
+  #|STATUS:COMPLETED
+  #|PRIORITY:5
+  #|PERCENT-COMPLETE:100
+  #|CATEGORIES:MoonBit,Tests
+  #|END:VTODO
+  #|BEGIN:VFREEBUSY
+  #|UID:demo-availability
+  #|DTSTAMP:20260801T000000Z
+  #|DTSTART:20260801T000000Z
+  #|DTEND:20260831T235959Z
+  #|FREEBUSY:20260803T090000Z/20260803T093000Z,20260805T090000Z/PT30M
+  #|FREEBUSY;FBTYPE=BUSY-TENTATIVE:20260812T090000Z/PT30M
+  #|FREEBUSY;FBTYPE=FREE:20260813T140000Z/PT2H
+  #|COMMENT:Demo availability exported by MoonCal
+  #|END:VFREEBUSY
   #|END:VCALENDAR
 
 ///|
