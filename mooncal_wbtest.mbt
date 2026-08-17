@@ -120,6 +120,8 @@ test "reject property without colon" {
 test "parse sample calendar" {
   let calendar = must_calendar(sample_ics)
   @test.assert_eq(calendar.events.length(), 2)
+  @test.assert_eq(calendar.tasks.length(), 3)
+  @test.assert_eq(calendar.freebusy.length(), 1)
   @test.assert_eq(calendar.events[0].uid, "demo-standup")
 }
 
@@ -293,6 +295,11 @@ test "summary counts" {
   @test.assert_eq(summary.event_count, 2)
   @test.assert_eq(summary.recurring_event_count, 1)
   @test.assert_eq(summary.all_day_event_count, 1)
+  @test.assert_eq(summary.task_count, 3)
+  @test.assert_eq(summary.open_task_count, 2)
+  @test.assert_eq(summary.completed_task_count, 1)
+  @test.assert_eq(summary.blocked_time_count, 1)
+  @test.assert_eq(summary.blocked_period_count, 4)
 }
 
 ///|
@@ -322,7 +329,11 @@ test "ics text escaping" {
 test "calendar exports to json" {
   let json = calendar_to_json(must_calendar(sample_ics))
   assert_true(json.contains("\"events\""))
+  assert_true(json.contains("\"tasks\""))
+  assert_true(json.contains("\"freebusy\""))
   assert_true(json.contains("demo-standup"))
+  assert_true(json.contains("demo-docs"))
+  assert_true(json.contains("demo-availability"))
 }
 
 ///|
@@ -330,6 +341,8 @@ test "calendar exports to ics" {
   let ics = calendar_to_ics(must_calendar(sample_ics))
   assert_true(ics.contains("BEGIN:VCALENDAR"))
   assert_true(ics.contains("RRULE:FREQ=WEEKLY"))
+  assert_true(ics.contains("BEGIN:VTODO"))
+  assert_true(ics.contains("BEGIN:VFREEBUSY"))
 }
 
 ///|
@@ -456,4 +469,445 @@ test "next occurrences" {
     }
     Err(_) => panic()
   }
+}
+
+///|
+test "parse todo metadata fields" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//Task Test//EN
+    #|BEGIN:VTODO
+    #|UID:task-meta
+    #|DTSTART;VALUE=DATE:20260801
+    #|DUE;VALUE=DATE:20260810
+    #|SUMMARY:Write docs
+    #|DESCRIPTION:Cover task APIs
+    #|STATUS:IN-PROCESS
+    #|PRIORITY:3
+    #|PERCENT-COMPLETE:40
+    #|CATEGORIES:Docs,Release
+    #|URL:https://mooncal.invalid/tasks/task-meta
+    #|RELATED-TO:demo-release
+    #|END:VTODO
+    #|END:VCALENDAR
+  let task = must_calendar(text).tasks[0]
+  @test.assert_eq(task.uid, "task-meta")
+  @test.assert_eq(task.start.map(x => x.format()), Some("2026-08-01"))
+  @test.assert_eq(task.due.map(x => x.format()), Some("2026-08-10"))
+  @test.assert_eq(task.summary, "Write docs")
+  @test.assert_eq(task.description, Some("Cover task APIs"))
+  @test.assert_eq(task.status, Some("IN-PROCESS"))
+  @test.assert_eq(task.priority, Some(3))
+  @test.assert_eq(task.percent_complete, Some(40))
+  @test.assert_eq(task.categories.length(), 2)
+  @test.assert_eq(task.related_to[0], "demo-release")
+}
+
+///|
+test "parse completed todo" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//Task Test//EN
+    #|BEGIN:VTODO
+    #|UID:task-done
+    #|COMPLETED:20260804T100000Z
+    #|SUMMARY:Done
+    #|STATUS:COMPLETED
+    #|PERCENT-COMPLETE:100
+    #|END:VTODO
+    #|END:VCALENDAR
+  let task = must_calendar(text).tasks[0]
+  assert_true(task_is_completed(task))
+  @test.assert_eq(
+    task.completed.map(x => x.format()),
+    Some("2026-08-04T10:00:00Z"),
+  )
+}
+
+///|
+test "missing todo uid fails" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|BEGIN:VTODO
+    #|SUMMARY:No UID
+    #|END:VTODO
+    #|END:VCALENDAR
+  assert_true(parse(text) is Err(_))
+}
+
+///|
+test "todo due before start fails" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|BEGIN:VTODO
+    #|UID:bad-task
+    #|DTSTART:20260810T090000Z
+    #|DUE:20260809T090000Z
+    #|END:VTODO
+    #|END:VCALENDAR
+  assert_true(parse(text) is Err(_))
+}
+
+///|
+test "find task by uid" {
+  let calendar = must_calendar(sample_ics)
+  assert_true(find_task(calendar, "demo-docs") is Some(_))
+  assert_true(find_task(calendar, "missing-task") is None)
+}
+
+///|
+test "open and completed task queries" {
+  let calendar = must_calendar(sample_ics)
+  let open = open_tasks(calendar)
+  let done = completed_tasks(calendar)
+  @test.assert_eq(open.length(), 2)
+  @test.assert_eq(done.length(), 1)
+  @test.assert_eq(open[0].uid, "demo-docs")
+  @test.assert_eq(done[0].uid, "demo-tests")
+}
+
+///|
+test "overdue task query uses caller supplied date" {
+  let calendar = must_calendar(sample_ics)
+  let overdue = overdue_tasks(calendar, DateTime(2026, 8, 19))
+  @test.assert_eq(overdue.length(), 1)
+  @test.assert_eq(overdue[0].uid, "demo-docs")
+}
+
+///|
+test "tasks due between query sorts by due date" {
+  let calendar = must_calendar(sample_ics)
+  let due = tasks_due_between(
+    calendar,
+    DateTime(2026, 8, 1),
+    DateTime(2026, 8, 20, hour=23, minute=59, second=59),
+  )
+  @test.assert_eq(due.length(), 2)
+  @test.assert_eq(due[0].uid, "demo-docs")
+  @test.assert_eq(due[1].uid, "demo-publish")
+}
+
+///|
+test "tasks due on date query" {
+  let calendar = must_calendar(sample_ics)
+  let due = tasks_due_on_date(calendar, DateTime(2026, 8, 18))
+  @test.assert_eq(due.length(), 1)
+  @test.assert_eq(due[0].uid, "demo-docs")
+}
+
+///|
+test "high priority task query" {
+  let calendar = must_calendar(sample_ics)
+  let items = high_priority_tasks(calendar)
+  @test.assert_eq(items.length(), 2)
+  @test.assert_eq(items[0].uid, "demo-docs")
+}
+
+///|
+test "task summary counts" {
+  let summary = summarize_tasks(must_calendar(sample_ics))
+  @test.assert_eq(summary.task_count, 3)
+  @test.assert_eq(summary.open_task_count, 2)
+  @test.assert_eq(summary.completed_task_count, 1)
+  @test.assert_eq(summary.in_process_task_count, 1)
+  @test.assert_eq(summary.high_priority_task_count, 2)
+  @test.assert_eq(summary.due_task_count, 2)
+  @test.assert_eq(summary.earliest_due.map(x => x.format()), Some("2026-08-18"))
+}
+
+///|
+test "task json export" {
+  let task = must_calendar(sample_ics).tasks[0]
+  let json = task_to_json(task)
+  assert_true(json.contains("\"uid\":\"demo-docs\""))
+  assert_true(json.contains("\"open\":true"))
+  assert_true(json.contains("\"percent_complete\":60"))
+}
+
+///|
+test "task ics export" {
+  let task = must_calendar(sample_ics).tasks[0]
+  let ics = task_to_ics(task)
+  assert_true(ics.contains("BEGIN:VTODO"))
+  assert_true(ics.contains("DUE;VALUE=DATE:20260818"))
+  assert_true(ics.contains("RELATED-TO:demo-release"))
+}
+
+///|
+test "task validation detects invalid status" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//Task Test//EN
+    #|BEGIN:VTODO
+    #|UID:bad-status
+    #|SUMMARY:Bad
+    #|STATUS:WAITING
+    #|END:VTODO
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "unknown-task-status"))
+}
+
+///|
+test "task validation detects priority and percent ranges" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//Task Test//EN
+    #|BEGIN:VTODO
+    #|UID:bad-range
+    #|SUMMARY:Bad
+    #|PRIORITY:10
+    #|PERCENT-COMPLETE:101
+    #|END:VTODO
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "priority-out-of-range"))
+  assert_true(diagnostics.any(d => d.code == "percent-out-of-range"))
+}
+
+///|
+test "task validation detects completed task without timestamp" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//Task Test//EN
+    #|BEGIN:VTODO
+    #|UID:done-without-time
+    #|SUMMARY:Done
+    #|STATUS:COMPLETED
+    #|END:VTODO
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "completed-without-timestamp"))
+}
+
+///|
+test "duplicate uid across event and task is diagnostic" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//Task Test//EN
+    #|BEGIN:VEVENT
+    #|UID:shared
+    #|DTSTART:20260801T090000Z
+    #|SUMMARY:Event
+    #|END:VEVENT
+    #|BEGIN:VTODO
+    #|UID:shared
+    #|SUMMARY:Task
+    #|END:VTODO
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "duplicate-uid"))
+}
+
+///|
+test "parse freebusy periods with duration and type" {
+  let calendar = must_calendar(sample_ics)
+  let item = calendar.freebusy[0]
+  @test.assert_eq(item.periods.length(), 4)
+  @test.assert_eq(item.periods[1].end.format(), "2026-08-05T09:30:00Z")
+  @test.assert_eq(item.periods[2].busy_type, "BUSY-TENTATIVE")
+  @test.assert_eq(item.periods[3].busy_type, "FREE")
+}
+
+///|
+test "freebusy periods between query" {
+  let calendar = must_calendar(sample_ics)
+  let periods = freebusy_periods_between(
+    calendar,
+    DateTime(2026, 8, 3),
+    DateTime(2026, 8, 6),
+  )
+  @test.assert_eq(periods.length(), 2)
+  @test.assert_eq(periods[0].start.format(), "2026-08-03T09:00:00Z")
+}
+
+///|
+test "busy periods between excludes free periods" {
+  let calendar = must_calendar(sample_ics)
+  let periods = busy_periods_between(
+    calendar,
+    DateTime(2026, 8, 1),
+    DateTime(2026, 8, 31),
+  )
+  @test.assert_eq(periods.length(), 3)
+}
+
+///|
+test "free periods between returns explicit free windows" {
+  let calendar = must_calendar(sample_ics)
+  let periods = free_periods_between(
+    calendar,
+    DateTime(2026, 8, 1),
+    DateTime(2026, 8, 31),
+  )
+  @test.assert_eq(periods.length(), 1)
+  @test.assert_eq(periods[0].busy_type, "FREE")
+}
+
+///|
+test "time is busy checks busy windows" {
+  let calendar = must_calendar(sample_ics)
+  assert_true(time_is_busy(calendar, DateTime(2026, 8, 3, hour=9, minute=10)))
+  assert_true(!time_is_busy(calendar, DateTime(2026, 8, 13, hour=15)))
+}
+
+///|
+test "next busy periods are sorted and limited" {
+  let calendar = must_calendar(sample_ics)
+  let periods = next_busy_periods(calendar, DateTime(2026, 8, 4), limit=2)
+  @test.assert_eq(periods.length(), 2)
+  @test.assert_eq(periods[0].start.format(), "2026-08-05T09:00:00Z")
+}
+
+///|
+test "freebusy summary counts" {
+  let summary = summarize_freebusy(must_calendar(sample_ics))
+  @test.assert_eq(summary.component_count, 1)
+  @test.assert_eq(summary.period_count, 4)
+  @test.assert_eq(summary.busy_period_count, 2)
+  @test.assert_eq(summary.tentative_period_count, 1)
+  @test.assert_eq(summary.free_period_count, 1)
+  @test.assert_eq(
+    summary.earliest_start.map(x => x.format()),
+    Some("2026-08-03T09:00:00Z"),
+  )
+}
+
+///|
+test "freebusy json export" {
+  let json = freebusy_to_json(must_calendar(sample_ics).freebusy[0])
+  assert_true(json.contains("\"uid\":\"demo-availability\""))
+  assert_true(json.contains("\"busy_type\":\"BUSY-TENTATIVE\""))
+  assert_true(json.contains("\"busy\":false"))
+}
+
+///|
+test "freebusy ics export" {
+  let ics = freebusy_to_ics(must_calendar(sample_ics).freebusy[0])
+  assert_true(ics.contains("BEGIN:VFREEBUSY"))
+  assert_true(ics.contains("FREEBUSY:20260803T090000Z/20260803T093000Z"))
+  assert_true(ics.contains("FREEBUSY;FBTYPE=FREE"))
+}
+
+///|
+test "freebusy missing uid and dtstamp are diagnostics" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//FreeBusy Test//EN
+    #|BEGIN:VFREEBUSY
+    #|FREEBUSY:20260801T100000Z/20260801T110000Z
+    #|END:VFREEBUSY
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "freebusy-missing-uid"))
+  assert_true(diagnostics.any(d => d.code == "freebusy-missing-dtstamp"))
+}
+
+///|
+test "freebusy empty component is diagnostic" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//FreeBusy Test//EN
+    #|BEGIN:VFREEBUSY
+    #|UID:empty-freebusy
+    #|DTSTAMP:20260801T000000Z
+    #|END:VFREEBUSY
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "freebusy-no-periods"))
+}
+
+///|
+test "freebusy backwards period fails" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|BEGIN:VFREEBUSY
+    #|UID:bad-freebusy
+    #|DTSTAMP:20260801T000000Z
+    #|FREEBUSY:20260801T110000Z/20260801T100000Z
+    #|END:VFREEBUSY
+    #|END:VCALENDAR
+  assert_true(parse(text) is Err(_))
+}
+
+///|
+test "freebusy period outside declared window is diagnostic" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//FreeBusy Test//EN
+    #|BEGIN:VFREEBUSY
+    #|UID:window
+    #|DTSTAMP:20260801T000000Z
+    #|DTSTART:20260810T000000Z
+    #|DTEND:20260811T000000Z
+    #|FREEBUSY:20260809T230000Z/20260810T010000Z
+    #|END:VFREEBUSY
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "freebusy-period-before-window"))
+}
+
+///|
+test "freebusy unknown type is diagnostic" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|PRODID:-//MoonCal//FreeBusy Test//EN
+    #|BEGIN:VFREEBUSY
+    #|UID:unknown-type
+    #|DTSTAMP:20260801T000000Z
+    #|FREEBUSY;FBTYPE=BUSY-MAYBE:20260801T100000Z/20260801T110000Z
+    #|END:VFREEBUSY
+    #|END:VCALENDAR
+  let diagnostics = validate_calendar(must_calendar(text))
+  assert_true(diagnostics.any(d => d.code == "unknown-freebusy-type"))
+}
+
+///|
+test "freebusy malformed period fails" {
+  let text =
+    #|BEGIN:VCALENDAR
+    #|VERSION:2.0
+    #|BEGIN:VFREEBUSY
+    #|UID:bad-period
+    #|DTSTAMP:20260801T000000Z
+    #|FREEBUSY:20260801T100000Z
+    #|END:VFREEBUSY
+    #|END:VCALENDAR
+  assert_true(parse(text) is Err(_))
+}
+
+///|
+test "summary json includes task and freebusy counts" {
+  let json = summary_to_json(summarize(must_calendar(sample_ics)))
+  assert_true(json.contains("\"task_count\":3"))
+  assert_true(json.contains("\"freebusy_period_count\":4"))
+}
+
+///|
+test "task summary json export" {
+  let json = task_summary_to_json(summarize_tasks(must_calendar(sample_ics)))
+  assert_true(json.contains("\"open_task_count\":2"))
+  assert_true(json.contains("\"due_task_count\":2"))
+}
+
+///|
+test "freebusy summary json export" {
+  let json = freebusy_summary_to_json(
+    summarize_freebusy(must_calendar(sample_ics)),
+  )
+  assert_true(json.contains("\"period_count\":4"))
+  assert_true(json.contains("\"free_period_count\":1"))
 }
